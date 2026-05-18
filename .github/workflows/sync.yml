@@ -4,6 +4,7 @@ name: Sync GitHub event to Jira
 # own thin caller workflow (see .github/workflow-templates/jira-sync.yml).
 
 on:
+  workflow_dispatch:          # manual trigger for testing
   workflow_call:
     secrets:
       JIRA_BASE_URL:
