@@ -8,6 +8,13 @@ jira:
 github:
   owner: p-potvin
 
+# Map CURRENT GitHub repo name -> the name used in backfill labels.
+# Use when a tracked repo has been renamed after backfill so live_sync.py
+# can still find the existing Epic/Tasks via JQL label search.
+repo_aliases:
+  vaultwares-themes: vault-themes
+  vaultwares-adk: vaultwares-agentciation
+
 # Throttle between Jira write operations (seconds). Atlassian Cloud doesn't
 # publish a hard RPS limit but starts adaptively throttling around 10 RPS.
 write_delay: 0.15
@@ -33,7 +40,7 @@ repos:
   - vaultwares-glass
   - vault-explorer
   - vault-player
-  - vaultwares-agentciation
+  - vaultwares-adk           # was: vaultwares-agentciation (renamed on GH)
   - windows-customizer
   - vault-guardian
   - vaultwares-docs
@@ -45,7 +52,7 @@ repos:
   - no-more-groceries
   - vaultwares-dispatch
   - cultural-rhythm
-  - vault-themes
+  - vaultwares-themes        # was: vault-themes (renamed on GH)
   - weekly-menu
   - vaultwares-template
   - vaultwares-identity-manager

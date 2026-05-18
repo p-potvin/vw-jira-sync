@@ -70,6 +70,12 @@ def get_owner_repo(event: Dict[str, Any]) -> tuple[str, str]:
     return owner, name
 
 
+def normalize_repo(cfg: Dict[str, Any], repo: str) -> str:
+    """If `repo` has been renamed since backfill, return the backfill name so
+    Jira label lookups (gh-repo-..., gh-pr-...) match what already exists."""
+    return cfg.get("repo_aliases", {}).get(repo, repo)
+
+
 def label_epic(owner: str, repo: str) -> str:
     return f"gh-repo-{owner}-{repo}"
 
@@ -103,7 +109,8 @@ def find_task_for_pr(
 
 def handle_pull_request(session, cfg, event):
     pr = event["pull_request"]
-    owner, repo = get_owner_repo(event)
+    owner, gh_repo = get_owner_repo(event)
+    repo = normalize_repo(cfg, gh_repo)
     num = pr["number"]
     action = event.get("action", "")
     print(f"pull_request[{action}] {owner}/{repo}#{num}")
@@ -137,7 +144,8 @@ def handle_pull_request(session, cfg, event):
 def handle_pull_request_review(session, cfg, event):
     review = event["review"]
     pr = event["pull_request"]
-    owner, repo = get_owner_repo(event)
+    owner, gh_repo = get_owner_repo(event)
+    repo = normalize_repo(cfg, gh_repo)
     num = pr["number"]
     print(f"pull_request_review {owner}/{repo}#{num} state={review.get('state')}")
 
@@ -157,7 +165,8 @@ def handle_pull_request_review(session, cfg, event):
 def handle_pull_request_review_comment(session, cfg, event):
     comment = event["comment"]
     pr = event["pull_request"]
-    owner, repo = get_owner_repo(event)
+    owner, gh_repo = get_owner_repo(event)
+    repo = normalize_repo(cfg, gh_repo)
     num = pr["number"]
     print(f"pull_request_review_comment {owner}/{repo}#{num}")
 
@@ -181,7 +190,8 @@ def handle_issue_comment(session, cfg, event):
         print("issue_comment on non-PR -- ignored")
         return
     comment = event["comment"]
-    owner, repo = get_owner_repo(event)
+    owner, gh_repo = get_owner_repo(event)
+    repo = normalize_repo(cfg, gh_repo)
     num = issue["number"]
     print(f"issue_comment on PR {owner}/{repo}#{num}")
 
@@ -201,7 +211,8 @@ def handle_issue_comment(session, cfg, event):
 
 
 def handle_push(session, cfg, event):
-    owner, repo = get_owner_repo(event)
+    owner, gh_repo = get_owner_repo(event)
+    repo = normalize_repo(cfg, gh_repo)
     ref = event.get("ref", "")
     default_branch = event["repository"].get("default_branch", "main")
     if not ref.endswith(f"/{default_branch}"):
