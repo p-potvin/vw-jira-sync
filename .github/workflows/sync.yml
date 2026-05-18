@@ -1,0 +1,44 @@
+name: Sync GitHub event to Jira
+
+# Reusable workflow. Each tracked repo calls this via workflow_call from its
+# own thin caller workflow (see .github/workflow-templates/jira-sync.yml).
+
+on:
+  workflow_call:
+    secrets:
+      JIRA_BASE_URL:
+        required: true
+      JIRA_EMAIL:
+        required: true
+      JIRA_TOKEN:
+        required: true
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
+    steps:
+      - name: Checkout vw-jira-sync source
+        uses: actions/checkout@v4
+        with:
+          repository: p-potvin/vw-jira-sync
+          ref: main
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Sync event to Jira
+        env:
+          JIRA_BASE_URL: ${{ secrets.JIRA_BASE_URL }}
+          JIRA_EMAIL: ${{ secrets.JIRA_EMAIL }}
+          JIRA_TOKEN: ${{ secrets.JIRA_TOKEN }}
+          GH_TOKEN: ${{ github.token }}
+        run: python scripts/live_sync.py

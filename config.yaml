@@ -1,0 +1,62 @@
+jira:
+  base_url: https://vaultwares.atlassian.net
+  email: lefondhumain@pm.me
+  project_key: VW
+  epic_issuetype_id: "10005"
+  task_issuetype_id: "10007"
+
+github:
+  owner: p-potvin
+
+# Throttle between Jira write operations (seconds). Atlassian Cloud doesn't
+# publish a hard RPS limit but starts adaptively throttling around 10 RPS.
+write_delay: 0.15
+
+# GH PR state -> Jira workflow status name
+status_map:
+  open: PR Created
+  draft: To Do
+  merged: Done
+  closed: Done
+
+# Repos to backfill / sync.
+# Non-forks of p-potvin minus agent-ledger (non-tracked).
+# vaultwares-realtime covers the "realtime-stt" exception.
+repos:
+  - agentic-markup
+  - vaultwares-realtime
+  - vaultwares-studio
+  - python-scripts
+  - vault-central
+  - vault-flows
+  - vaultwares-pipelines
+  - vaultwares-glass
+  - vault-explorer
+  - vault-player
+  - vaultwares-agentciation
+  - windows-customizer
+  - vault-guardian
+  - vaultwares-docs
+  - automation-suite
+  - i-dub-thee
+  - wander
+  - vaultwares-website
+  - traffic-pulse
+  - no-more-groceries
+  - vaultwares-dispatch
+  - cultural-rhythm
+  - vault-themes
+  - weekly-menu
+  - vaultwares-template
+  - vaultwares-identity-manager
+  - vaultwares-decompile
+  - nexus-orchestrator
+  - nexus-flow
+  - vaultwares-cli
+  - vaultwares-toolkit
+  - gallery-scraper
+  - debrid-media-manager
+  - event-horizon
+  - auto-backup
+  - vaultwares-sentry
+  - nemo-playground
