@@ -17,9 +17,6 @@ on:
 jobs:
   sync:
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      pull-requests: read
     steps:
       - name: Checkout vw-jira-sync source
         uses: actions/checkout@v4
