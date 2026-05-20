@@ -256,7 +256,11 @@ def backfill_repo(session, cfg: Dict[str, Any], repo: str, dry_run: bool) -> Dic
             print(f"  PR #{num} -> {mapping['prs'][str(num)]} (skip)")
             continue
 
-        commits = gh_pr_commits(owner, repo, num)
+        try:
+            commits = gh_pr_commits(owner, repo, num)
+        except Exception as e:  # noqa: BLE001
+            print(f"    WARN: commits for #{num} failed: {e}", file=sys.stderr)
+            commits = []
         payload = build_task_payload(cfg, repo, pr, commits)
         state = pr_state(pr)
 
@@ -272,9 +276,21 @@ def backfill_repo(session, cfg: Dict[str, Any], repo: str, dry_run: bool) -> Dic
 
         mapping["prs"][str(num)] = task_key
 
-        issue_comments = gh_pr_issue_comments(owner, repo, num)
-        review_comments = gh_pr_review_comments(owner, repo, num)
-        reviews = gh_pr_reviews(owner, repo, num)
+        try:
+            issue_comments = gh_pr_issue_comments(owner, repo, num)
+        except Exception as e:  # noqa: BLE001
+            print(f"    WARN: issue_comments for #{num} failed: {e}", file=sys.stderr)
+            issue_comments = []
+        try:
+            review_comments = gh_pr_review_comments(owner, repo, num)
+        except Exception as e:  # noqa: BLE001
+            print(f"    WARN: review_comments for #{num} failed: {e}", file=sys.stderr)
+            review_comments = []
+        try:
+            reviews = gh_pr_reviews(owner, repo, num)
+        except Exception as e:  # noqa: BLE001
+            print(f"    WARN: reviews for #{num} failed: {e}", file=sys.stderr)
+            reviews = []
         total = (
             len(issue_comments)
             + len(review_comments)
