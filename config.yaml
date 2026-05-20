@@ -19,12 +19,11 @@ repo_owners:
   qa-automation: Prom-King
   tube-sites: Prom-King
 
-# Map CURRENT GitHub repo name -> the name used in backfill labels.
-# Use when a tracked repo has been renamed after backfill so live_sync.py
-# can still find existing Tasks via JQL label search.
-repo_aliases:
-  vaultwares-themes: vault-themes
-  vaultwares-adk: vaultwares-agentciation
+# When a GitHub repo is renamed:
+#   1. Update its entry in repo_project_keys to the new name (same Jira key).
+#   2. Remove the old name from repos list, add the new name.
+#   3. Re-run backfill --repo <new-name> to tag new issues with the current label.
+#   Labels always use the current GitHub repo name; no alias mapping needed.
 
 # Throttle between Jira write operations (seconds). Atlassian Cloud doesn't
 # publish a hard RPS limit but starts adaptively throttling around 10 RPS.

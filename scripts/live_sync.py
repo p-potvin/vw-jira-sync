@@ -69,8 +69,9 @@ def get_owner_repo(event: Dict[str, Any]) -> tuple[str, str]:
 
 
 def normalize_repo(cfg: Dict[str, Any], repo: str) -> str:
-    """Map renamed repos back to their backfill label name."""
-    return cfg.get("repo_aliases", {}).get(repo, repo)
+    """No-op: repo_aliases is deprecated. Labels now always use the current
+    GitHub repo name. Kept as a pass-through so callers don't need changing."""
+    return repo
 
 
 def label_pr_task(owner: str, repo: str, pr_num: int) -> str:
