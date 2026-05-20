@@ -54,7 +54,7 @@ repo_project_keys:
   vault-guardian: VGRD
   vaultwares-docs: VDOCS
   automation-suite: ASUIT
-  i-dub-thee: IDUB
+  vaultwares-asttro: IDUB          # was: i-dub-thee
   wander: WAND
   vaultwares-website: VWEB
   traffic-pulse: TRAF
@@ -100,7 +100,7 @@ repos:
   - vault-guardian
   - vaultwares-docs
   - automation-suite
-  - i-dub-thee
+  - vaultwares-asttro             # was: i-dub-thee
   - wander
   - vaultwares-website
   - traffic-pulse
