@@ -23,6 +23,11 @@ ROOT = Path(__file__).resolve().parent.parent
 CONFIG = yaml.safe_load((ROOT / "config.yaml").read_text(encoding="utf-8"))
 OWNER = CONFIG["github"]["owner"]
 REPOS = CONFIG["repos"]
+REPO_OWNERS: dict = CONFIG.get("repo_owners", {})
+
+
+def owner_for(repo: str) -> str:
+    return REPO_OWNERS.get(repo, OWNER)
 
 WORKFLOW_SRC = ROOT / ".github" / "workflow-templates" / "jira-sync.yml"
 WORKFLOW_DEST = ".github/workflows/jira-sync.yml"
@@ -184,12 +189,13 @@ def main() -> int:
     errors = 0
 
     for repo in repos:
-        print(f"\n[{repo}]")
+        owner = owner_for(repo)
+        print(f"\n[{owner}/{repo}]")
         try:
             if args.strategy == "main":
-                deploy_to_main(OWNER, repo, content)
+                deploy_to_main(owner, repo, content)
             else:
-                deploy_via_pr(OWNER, repo, content)
+                deploy_via_pr(owner, repo, content)
         except subprocess.CalledProcessError as e:
             err = (e.stderr or e.stdout or "").strip()
             print(f"  FAILED: {err}", file=sys.stderr)
