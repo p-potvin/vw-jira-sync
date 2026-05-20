@@ -24,9 +24,14 @@ CONFIG = yaml.safe_load((ROOT / "config.yaml").read_text(encoding="utf-8"))
 
 OWNER = CONFIG["github"]["owner"]
 REPOS = CONFIG["repos"]
+REPO_OWNERS: dict = CONFIG.get("repo_owners", {})
 
 JIRA_BASE_URL = CONFIG["jira"]["base_url"]
 JIRA_EMAIL = CONFIG["jira"]["email"]
+
+
+def owner_for(repo: str) -> str:
+    return REPO_OWNERS.get(repo, OWNER)
 
 
 def load_token() -> str:
@@ -40,7 +45,7 @@ def load_token() -> str:
 
 
 def set_secret(repo: str, name: str, value: str) -> None:
-    cmd = ["gh", "secret", "set", name, "--repo", f"{OWNER}/{repo}", "--body", "-"]
+    cmd = ["gh", "secret", "set", name, "--repo", f"{owner_for(repo)}/{repo}", "--body", "-"]
     try:
         subprocess.run(cmd, input=value, text=True, check=True, capture_output=True)
         print(f"  {name} OK")
