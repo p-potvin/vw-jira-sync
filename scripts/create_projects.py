@@ -24,6 +24,7 @@ import yaml
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from jira_sync import jira_request, jira_session, load_token
+from backfill import repo_owner
 
 ROOT = Path(__file__).resolve().parent.parent
 CONFIG_PATH = ROOT / "config.yaml"
@@ -98,7 +99,7 @@ def main() -> int:
             continue
 
         try:
-            result = create_project(session, key, repo, owner, lead_id)
+            result = create_project(session, key, repo, repo_owner(cfg, repo), lead_id)
             print(f"  [{key}] {repo} — created (id={result.get('id')})")
             created.append(key)
             time.sleep(0.5)

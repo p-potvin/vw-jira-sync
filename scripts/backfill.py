@@ -78,6 +78,11 @@ def repo_project_key(cfg: Dict[str, Any], repo: str) -> str:
     return key
 
 
+def repo_owner(cfg: Dict[str, Any], repo: str) -> str:
+    """Return the GitHub owner for this repo, falling back to github.owner."""
+    return cfg.get("repo_owners", {}).get(repo, cfg["github"]["owner"])
+
+
 def load_mapping(repo: str) -> Dict[str, Any]:
     p = MAPPING_DIR / f"{repo}.json"
     if p.exists():
@@ -249,7 +254,7 @@ def build_direct_commit_comment(c: Dict[str, Any]) -> Dict[str, Any]:
 def backfill_repo(session, cfg: Dict[str, Any], repo: str, dry_run: bool) -> Dict[str, Any]:
     print(f"\n=== {repo} ===")
     mapping = load_mapping(repo)
-    owner = cfg["github"]["owner"]
+    owner = repo_owner(cfg, repo)
     delay = float(cfg.get("write_delay", 0.15))
     project_key = repo_project_key(cfg, repo)
     print(f"  project: {project_key}")

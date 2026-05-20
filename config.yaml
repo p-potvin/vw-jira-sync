@@ -11,6 +11,14 @@ jira:
 github:
   owner: p-potvin
 
+# Per-repo GitHub owner override. If a repo belongs to a different org/user,
+# list it here. Falls back to github.owner for anything not listed.
+repo_owners:
+  link-sharing: Prom-King
+  prelanding-page: Prom-King
+  qa-automation: Prom-King
+  tube-sites: Prom-King
+
 # Map CURRENT GitHub repo name -> the name used in backfill labels.
 # Use when a tracked repo has been renamed after backfill so live_sync.py
 # can still find existing Tasks via JQL label search.
@@ -30,6 +38,7 @@ status_map:
   closed: Done
 
 # One Jira project per GitHub repo. Keys must be uppercase, 2-10 chars.
+# PK prefix = Prom-King org repos
 repo_project_keys:
   agentic-markup: AGMK
   vaultwares-realtime: VLRT
@@ -68,6 +77,11 @@ repo_project_keys:
   auto-backup: ABKP
   vaultwares-sentry: VSENT
   nemo-playground: NEMO
+  # Prom-King
+  link-sharing: PKLS
+  prelanding-page: PKPRE
+  qa-automation: PKQA
+  tube-sites: PKTS
 
 # Repos to backfill / sync.
 # Non-forks of p-potvin minus agent-ledger (non-tracked).
@@ -109,3 +123,8 @@ repos:
   - auto-backup
   - vaultwares-sentry
   - nemo-playground
+  # Prom-King
+  - link-sharing
+  - prelanding-page
+  - qa-automation
+  - tube-sites
