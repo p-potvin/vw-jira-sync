@@ -16,7 +16,9 @@ on:
 
 jobs:
   sync:
-    runs-on: ubuntu-latest
+    # Security posture: do not run on GitHub-hosted runners. Execute inside the
+    # tailnet on the GreenCloud VPS runner.
+    runs-on: [self-hosted, greencloud-vps]
     steps:
       - name: Checkout vw-jira-sync source
         uses: actions/checkout@v4
