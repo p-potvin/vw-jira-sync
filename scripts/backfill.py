@@ -82,11 +82,11 @@ def load_mapping(repo: str) -> Dict[str, Any]:
     p = MAPPING_DIR / f"{repo}.json"
     if p.exists():
         data = json.loads(p.read_text(encoding="utf-8"))
-        # Migrate old format (epic field) to new (commits_issue)
-        if "epic" in data and "commits_issue" not in data:
-            data["commits_issue"] = data.pop("epic")
+        # Drop legacy keys from old formats
+        data.pop("epic", None)
+        data.pop("commits_issue", None)
         return data
-    return {"commits_issue": None, "prs": {}, "commits": {}}
+    return {"prs": {}, "commits": {}}
 
 
 def save_mapping(repo: str, mapping: Dict[str, Any]) -> None:
@@ -164,32 +164,40 @@ def build_task_payload(
     }
 
 
-def build_commits_issue_payload(cfg: Dict[str, Any], repo: str, info: Dict[str, Any]) -> Dict[str, Any]:
-    """A single Task per project that collects direct-to-main commits as comments."""
+def build_commit_task_payload(cfg: Dict[str, Any], repo: str, c: Dict[str, Any]) -> Dict[str, Any]:
+    """One Task per direct commit pushed to the default branch."""
     project_key = repo_project_key(cfg, repo)
     owner = cfg["github"]["owner"]
+    sha = c["sha"]
+    msg = c["commit"]["message"]
+    first_line = msg.splitlines()[0][:200]
+    author = (c["commit"]["author"] or {}).get("name", "?")
+    date = (c["commit"]["author"] or {}).get("date", "")
+    url = c.get("html_url", "")
+
     desc = adf_doc(
-        adf_heading("Direct commits log", 2),
-        adf_paragraph(
-            "Commits pushed directly to the default branch (not associated with a PR). "
-            "Each commit is posted as a comment below."
-        ),
-        adf_heading("Repository", 3),
-        adf_bullet_list(
-            [
-                f"URL: {info['html_url']}",
-                f"Default branch: {info.get('default_branch', 'main')}",
-                f"Description: {info.get('description') or '(none)'}",
-            ]
-        ),
+        adf_heading("Commit", 2),
+        adf_bullet_list([
+            f"SHA: {sha}",
+            f"Author: {author}",
+            f"Date: {date}",
+            f"URL: {url}",
+        ]),
+        adf_heading("Message", 3),
+        adf_code_block(truncate_text(msg, 8000)),
     )
+    summary = f"[{sha[:7]}] {first_line}"[:255]
     return {
         "fields": {
             "project": {"key": project_key},
             "issuetype": {"name": cfg["jira"].get("commits_issuetype_name", "Task")},
-            "summary": f"[{repo}] Direct commits",
+            "summary": summary,
             "description": desc,
-            "labels": [f"gh-repo-{owner}-{repo}", "direct-commits"],
+            "labels": [
+                f"gh-commit-{owner}-{repo}-{sha[:12]}",
+                f"gh-repo-{repo}",
+                "direct-commit",
+            ],
         }
     }
 
@@ -348,40 +356,23 @@ def backfill_repo(session, cfg: Dict[str, Any], repo: str, dry_run: bool) -> Dic
         f"skipped {skipped_merge} merge commit(s)"
     )
 
-    if direct:
-        # Ensure the "Direct Commits" task exists
-        commits_key = mapping.get("commits_issue")
-        if not commits_key:
-            label = f"gh-repo-{owner}-{repo}"
-            commits_key = jira_find_by_label(session, project_key, label)
-            if not commits_key:
-                payload = build_commits_issue_payload(cfg, repo, info)
-                if dry_run:
-                    print("  [DRY-RUN] would create 'Direct Commits' task")
-                    commits_key = f"{project_key}-DRYCOMMITS"
-                else:
-                    result = jira_create_issue(session, payload)
-                    commits_key = result["key"]
-                    print(f"  created 'Direct Commits' task {commits_key}")
-                    time.sleep(delay)
-            mapping["commits_issue"] = commits_key
-            if not dry_run:
-                save_mapping(repo, mapping)
-
-        for c in direct:
-            sha = c["sha"]
-            if sha in mapping.get("commits", {}):
-                continue
-            if dry_run:
-                print(f"  [DRY-RUN] would post commit {sha[:7]} to {commits_key}")
-            else:
-                jira_add_comment(session, commits_key, build_direct_commit_comment(c))
-                mapping["commits"][sha] = commits_key
-                time.sleep(delay)
-
+    for c in direct:
+        sha = c["sha"]
+        if sha in mapping.get("commits", {}):
+            print(f"  commit {sha[:7]} already synced, skip")
+            continue
+        payload = build_commit_task_payload(cfg, repo, c)
+        if dry_run:
+            print(f"  [DRY-RUN] commit {sha[:7]} -- Task payload (truncated):")
+            print(json.dumps(payload, indent=2)[:1000])
+            mapping["commits"][sha] = f"{project_key}-DRYCOMMIT"
+        else:
+            result = jira_create_issue(session, payload)
+            task_key = result["key"]
+            mapping["commits"][sha] = task_key
+            print(f"  commit {sha[:7]} -> Task {task_key}")
+            time.sleep(delay)
         if not dry_run:
-            if direct:
-                print(f"  posted direct commits to {commits_key}")
             save_mapping(repo, mapping)
 
     return {

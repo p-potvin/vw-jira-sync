@@ -28,7 +28,6 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from jira_sync import (  # noqa: E402
     gh_api,
     gh_pr_commits,
-    gh_repo_info,
     jira_add_comment,
     jira_create_issue,
     jira_find_by_label,
@@ -38,8 +37,7 @@ from jira_sync import (  # noqa: E402
     load_token,
 )
 from backfill import (  # noqa: E402
-    build_commits_issue_payload,
-    build_direct_commit_comment,
+    build_commit_task_payload,
     build_pr_comment,
     build_review_summary,
     build_task_payload,
@@ -79,9 +77,6 @@ def label_pr_task(owner: str, repo: str, pr_num: int) -> str:
     return f"gh-pr-{owner}-{repo}-{pr_num}"
 
 
-def label_commits_task(owner: str, repo: str) -> str:
-    return f"gh-repo-{owner}-{repo}"
-
 
 def find_task_for_pr(
     session, cfg: Dict[str, Any], owner: str, repo: str, pr_num: int
@@ -90,16 +85,10 @@ def find_task_for_pr(
     return jira_find_by_label(session, proj, label_pr_task(owner, repo, pr_num))
 
 
-def ensure_commits_task(session, cfg: Dict[str, Any], owner: str, repo: str) -> str:
-    """Find or create the 'Direct Commits' task for this repo's project."""
+def find_commit_task(session, cfg: Dict[str, Any], owner: str, repo: str, sha: str) -> Optional[str]:
+    """Return existing Task for this commit SHA, or None."""
     proj = repo_project_key(cfg, repo)
-    label = label_commits_task(owner, repo)
-    key = jira_find_by_label(session, proj, label)
-    if key:
-        return key
-    info = gh_repo_info(owner, repo)
-    result = jira_create_issue(session, build_commits_issue_payload(cfg, repo, info))
-    return result["key"]
+    return jira_find_by_label(session, proj, f"gh-commit-{owner}-{repo}-{sha[:12]}")
 
 
 # ---------------------------------------------------------------------------
@@ -215,23 +204,29 @@ def handle_push(session, cfg, event):
     if not commits:
         return
 
-    commits_task_key = ensure_commits_task(session, cfg, owner, repo)
-
     for c in commits:
         sha = c["id"]
         full = gh_api(f"repos/{owner}/{repo}/commits/{sha}")
         if len(full.get("parents") or []) > 1:
             print(f"  skip merge {sha[:7]}")
             continue
+        # If commit belongs to a PR, add a comment on that Task instead
         pulls = gh_api(f"repos/{owner}/{repo}/commits/{sha}/pulls") or []
-        target_key = commits_task_key
         if pulls:
             pr_num = pulls[0]["number"]
             t = find_task_for_pr(session, cfg, owner, repo, pr_num)
             if t:
-                target_key = t
-        jira_add_comment(session, target_key, build_direct_commit_comment(full))
-        print(f"  commit {sha[:7]} -> {target_key}")
+                from backfill import build_direct_commit_comment  # noqa: PLC0415
+                jira_add_comment(session, t, build_direct_commit_comment(full))
+                print(f"  commit {sha[:7]} -> comment on {t}")
+                continue
+        # Direct commit — create its own Task (idempotent)
+        existing = find_commit_task(session, cfg, owner, repo, sha)
+        if existing:
+            print(f"  commit {sha[:7]} already has Task {existing}, skip")
+            continue
+        result = jira_create_issue(session, build_commit_task_payload(cfg, repo, full))
+        print(f"  commit {sha[:7]} -> Task {result['key']}")
 
 
 # ---------------------------------------------------------------------------
