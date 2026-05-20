@@ -1,0 +1,31 @@
+{
+  "commits": {
+    "12f9b789062f719d3b7f4438beeed9f3747c28f3": "VCLI-9",
+    "216db563c7a73914d362391d68a1793b7cf5fe82": "VCLI-6",
+    "2aecc69931ca79f1e270009f1ff6a90332e67457": "VCLI-14",
+    "3d1a0adcc70bf1cec42049157ad8fe772f4531de": "VCLI-15",
+    "3fe17f690995382ac3ee8fc865659c07ec630360": "VCLI-11",
+    "411c89c87cb7fa48364dcd45c09a0edc972f6b28": "VCLI-23",
+    "486f8449a31bb5083f4e8f1664f0f2418a4d6e4e": "VCLI-25",
+    "4a16a2581c56d1972ace848e1d3f39f7f5e24e36": "VCLI-12",
+    "4d322b2928daaa794f457bf9cb6549cf56fdbb71": "VCLI-19",
+    "5892d014318442838439fca99b87f193ad8bd2ae": "VCLI-18",
+    "5a6c00bea66f97cb6f49981414d066677bc0c474": "VCLI-5",
+    "767424ae8636d02b1493dee466c85b749efd7240": "VCLI-8",
+    "80ba3420bcc7a32e07c9a82ae7f23dae2fc863ee": "VCLI-17",
+    "843026d00379f41cf7c215a542a31546931ecb1e": "VCLI-10",
+    "9f5a240c4f4a9c3e26692d404537db6eca8d62ee": "VCLI-4",
+    "a494013c0b24f84c8cf4f8214e174cb0c1171f29": "VCLI-7",
+    "c1bb66be8af616af098225e8d872c39016a19b8b": "VCLI-22",
+    "c5a64b46b513365dffcff78712f6f5c536ef073a": "VCLI-13",
+    "ed864e73e1cd67cd230187b76a6e27b84f4b8aef": "VCLI-20",
+    "ef643a27b6b9b9f4d22fe4373785a34a6ad75318": "VCLI-21",
+    "f83401321c1ec2da99da95ca25000902cef6266a": "VCLI-16",
+    "fd226f6a23accec0bfc576f16da1590d81de562b": "VCLI-24"
+  },
+  "prs": {
+    "1": "VCLI-3",
+    "2": "VCLI-2",
+    "3": "VCLI-1"
+  }
+}

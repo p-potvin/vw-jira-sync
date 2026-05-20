@@ -1,0 +1,40 @@
+{
+  "commits": {
+    "001d35c3a8ad28cd85e49a1e743d5863fe315aa2": "VADK-10",
+    "0d95f1a6125c80717f2f6728becf7e4f97358551": "VADK-11",
+    "1ad35fbba3cbbcbcb6f7f619d398d7f786efe372": "VADK-9",
+    "28a3cf1c69d939117ad07206193ad3333541d667": "VADK-22",
+    "369b3cb390378e7b9612ad693a2e28e7ac685427": "VADK-25",
+    "50dff82cde771b4a0a90ebefad06988a5c15e5e3": "VADK-28",
+    "52f7c61f4e41decb10d08ac3647826c3a4567727": "VADK-24",
+    "5dead0e6134d90064cddcbd2390484c6710d2203": "VADK-26",
+    "5f472ae43192ffe7d36a59558a3568eed8c3ed1f": "VADK-33",
+    "6a3695acdf5998405ea75f4f1224d3c26ab2b38d": "VADK-27",
+    "6a46dbf3632407cf2ee66f35182340a889e7bbe3": "VADK-30",
+    "709b6bfc5236dbd3056359c71646aaf4e350044d": "VADK-14",
+    "892c2c0309960b76d7d810b4537cf6a99b3a0188": "VADK-18",
+    "8ee700060ffb4dd073fc92b5774952dc858dbf7b": "VADK-23",
+    "919b3d7a4e9df7136f7896c5da71e056b5f35f32": "VADK-17",
+    "a0852c851dbbc78f4d7827d645f6465fba55b087": "VADK-20",
+    "a1c7ddccc07842143cd4e34e5c509079e05e1aac": "VADK-12",
+    "ac2f7ff8d05293a194ab56f9d9977beacb50059b": "VADK-32",
+    "ae703d0c40630a839314460e08f781b187c674ba": "VADK-19",
+    "b399977af0083fd61acfa38198a35a2801c03ebd": "VADK-31",
+    "cc366bd8c43ef23e644bc451bb4564f23bb54e44": "VADK-34",
+    "cec21b0bee2c7a477f1ab7fc43de1f4b7c4c405e": "VADK-21",
+    "d751c471862eefc107e850c46d13881949d485fd": "VADK-15",
+    "ec923a3bf07405d433edbf8643f6c4b436d2796a": "VADK-16",
+    "ee3ddc20237f582317ffb2e9aaa6d0486068f520": "VADK-13",
+    "ee62cc4d2718696af3cef22d7759c5fc31249ecf": "VADK-29"
+  },
+  "prs": {
+    "1": "VADK-8",
+    "2": "VADK-7",
+    "3": "VADK-6",
+    "4": "VADK-5",
+    "5": "VADK-4",
+    "6": "VADK-3",
+    "7": "VADK-2",
+    "8": "VADK-1"
+  }
+}

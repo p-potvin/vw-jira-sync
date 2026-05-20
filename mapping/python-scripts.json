@@ -1,0 +1,23 @@
+{
+  "commits": {
+    "03d384e303ee43a0822488e9be969c0b6385e9e6": "PYSCR-15",
+    "04d7fcbaa38f4e0675de61a821fab8ae1259af20": "PYSCR-13",
+    "05b8035ce624823bdc278f38b0d24736c8a6221e": "PYSCR-4",
+    "1fea235e4f0616c2e782115b287482698c4f5aca": "PYSCR-9",
+    "37a92db8fddb474eaa1ae772fc7272c8e6a74c10": "PYSCR-18",
+    "3d98219aef73342d0254cddc02270cf1c7d3de40": "PYSCR-7",
+    "4dcf679324ce970803b7333dc0a85b3ef234583d": "PYSCR-11",
+    "4ebcb5e2d5a9d88a67b0ba371ed4cfccbd088b6e": "PYSCR-6",
+    "7ee383889ea4369ddbe773c7459bc4ef5137fbd8": "PYSCR-16",
+    "8d36aa9d0457afa5b8ed0274754b5df574db41ac": "PYSCR-12",
+    "92568610f48800aeedbe7652fb02d8116fda7e56": "PYSCR-19",
+    "9821da8c9811156cbbef369f06236647933cd89d": "PYSCR-10",
+    "b5167d2b199235d002a1b1fdd09ca1d3fad15b9e": "PYSCR-5",
+    "da43cdbfd83e7944165b831603fb9d85915141ae": "PYSCR-8",
+    "def3d269af1a75107a6ee3e643d11117c02a6a10": "PYSCR-17",
+    "e5e467d2c7dcbdd5a62b461e28d82c7906e46472": "PYSCR-14"
+  },
+  "prs": {
+    "1": "PYSCR-3"
+  }
+}

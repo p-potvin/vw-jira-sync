@@ -1,0 +1,21 @@
+{
+  "commits": {
+    "1481c8966a3634d2594a62cfbdcd70e0d3511047": "VDCMP-14",
+    "148cd05e0fddf7f2571b39f66b52ad13c2b012bf": "VDCMP-12",
+    "44d65db1d359da32b5441829662b99344c328d0e": "VDCMP-7",
+    "6d0418985303d8bea1bcb23c3dc898206150aefe": "VDCMP-4",
+    "82f4ce7b0f58fd47d6a7e0a32dc71d77e0dccd2d": "VDCMP-6",
+    "8ef5c251f58e8e830dde57c1e2526f1e08585796": "VDCMP-9",
+    "9e944c96e996a181d7324ae5995fe559d8ec9408": "VDCMP-15",
+    "9f50c1217dac1c616f694210a9e8a7168593eb5f": "VDCMP-10",
+    "a73de4dbd356850b4554d4b4471a0bb059a1a30a": "VDCMP-11",
+    "c3b37b210435bdc6e415604332d5f8b2df374774": "VDCMP-5",
+    "d66cf17d0ac644c3fd2be4bc206e2dfe84279b22": "VDCMP-8",
+    "efb1628e568117402a9f023e8dcd446814f68cac": "VDCMP-13"
+  },
+  "prs": {
+    "1": "VDCMP-3",
+    "2": "VDCMP-2",
+    "3": "VDCMP-1"
+  }
+}
