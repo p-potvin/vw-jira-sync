@@ -1,16 +1,19 @@
 jira:
   base_url: https://vaultwares.atlassian.net
   email: lefondhumain@pm.me
+  # Legacy single-project key (VW). Kept for reference; new sync uses
+  # per-repo project keys from repo_project_keys below.
   project_key: VW
-  epic_issuetype_id: "10005"
-  task_issuetype_id: "10007"
+  # Issue type names used for new per-repo projects (team-managed).
+  task_issuetype_name: "Task"
+  commits_issuetype_name: "Task"
 
 github:
   owner: p-potvin
 
 # Map CURRENT GitHub repo name -> the name used in backfill labels.
 # Use when a tracked repo has been renamed after backfill so live_sync.py
-# can still find the existing Epic/Tasks via JQL label search.
+# can still find existing Tasks via JQL label search.
 repo_aliases:
   vaultwares-themes: vault-themes
   vaultwares-adk: vaultwares-agentciation
@@ -21,14 +24,53 @@ write_delay: 0.15
 
 # GH PR state -> Jira workflow status name
 status_map:
-  open: PR Created
+  open: In Progress
   draft: To Do
   merged: Done
   closed: Done
 
+# One Jira project per GitHub repo. Keys must be uppercase, 2-10 chars.
+repo_project_keys:
+  agentic-markup: AGMK
+  vaultwares-realtime: VLRT
+  vaultwares-studio: VSTUD
+  python-scripts: PYSCR
+  vault-central: VCENT
+  vault-flows: VFLOW
+  vaultwares-pipelines: VPIPE
+  vaultwares-glass: VGLS
+  vault-explorer: VEXP
+  vault-player: VPLAY
+  vaultwares-adk: VADK
+  windows-customizer: WCUST
+  vault-guardian: VGRD
+  vaultwares-docs: VDOCS
+  automation-suite: ASUIT
+  i-dub-thee: IDUB
+  wander: WAND
+  vaultwares-website: VWEB
+  traffic-pulse: TRAF
+  no-more-groceries: NMGR
+  vaultwares-dispatch: VDISP
+  cultural-rhythm: CRHM
+  vaultwares-themes: VTHM
+  weekly-menu: WMNU
+  vaultwares-template: VTMPL
+  vaultwares-identity-manager: VIDM
+  vaultwares-decompile: VDCMP
+  nexus-orchestrator: NXOR
+  nexus-flow: NXFL
+  vaultwares-cli: VCLI
+  vaultwares-toolkit: VTLK
+  gallery-scraper: GSCR
+  debrid-media-manager: DBRM
+  event-horizon: EVHR
+  auto-backup: ABKP
+  vaultwares-sentry: VSENT
+  nemo-playground: NEMO
+
 # Repos to backfill / sync.
 # Non-forks of p-potvin minus agent-ledger (non-tracked).
-# vaultwares-realtime covers the "realtime-stt" exception.
 repos:
   - agentic-markup
   - vaultwares-realtime

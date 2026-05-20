@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
-"""One-shot backfill of p-potvin GitHub history into Jira project VW.
+"""One-shot backfill of p-potvin GitHub history into per-repo Jira projects.
 
 Per repo:
-  * Creates 1 Epic.
-  * Creates 1 Task per PR (any state), linked to the Epic as parent.
+  * Routes to the repo's dedicated Jira project (from repo_project_keys in config).
+  * Creates 1 Task per PR (any state) directly in the project.
   * Adds Jira comments for PR issue comments, review comments, and review bodies.
-  * Adds Jira comments on the Epic for each default-branch commit not in any PR.
+  * Creates 1 "Direct Commits" Task per project and posts non-PR default-branch
+    commits as comments on it.
 
 Resumable: each repo writes `mapping/<repo>.json` after every issue/comment.
 Re-running skips items already present in the mapping file.
@@ -27,7 +28,7 @@ import json
 import sys
 import time
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
 import yaml
 
@@ -48,6 +49,7 @@ from jira_sync import (  # noqa: E402
     gh_repo_info,
     jira_add_comment,
     jira_create_issue,
+    jira_find_by_label,
     jira_session,
     jira_transition,
     load_token,
@@ -68,11 +70,23 @@ def load_config() -> Dict[str, Any]:
         return yaml.safe_load(f)
 
 
+def repo_project_key(cfg: Dict[str, Any], repo: str) -> str:
+    """Return the Jira project key for this repo. Raises if not configured."""
+    key = cfg.get("repo_project_keys", {}).get(repo)
+    if not key:
+        raise RuntimeError(f"No project key configured for repo '{repo}'")
+    return key
+
+
 def load_mapping(repo: str) -> Dict[str, Any]:
     p = MAPPING_DIR / f"{repo}.json"
     if p.exists():
-        return json.loads(p.read_text(encoding="utf-8"))
-    return {"epic": None, "prs": {}, "commits": {}}
+        data = json.loads(p.read_text(encoding="utf-8"))
+        # Migrate old format (epic field) to new (commits_issue)
+        if "epic" in data and "commits_issue" not in data:
+            data["commits_issue"] = data.pop("epic")
+        return data
+    return {"commits_issue": None, "prs": {}, "commits": {}}
 
 
 def save_mapping(repo: str, mapping: Dict[str, Any]) -> None:
@@ -95,41 +109,16 @@ def pr_state(pr: Dict[str, Any]) -> str:
     return pr.get("state", "closed")
 
 
-def build_epic_payload(cfg: Dict[str, Any], repo: str, info: Dict[str, Any]) -> Dict[str, Any]:
-    desc = adf_doc(
-        adf_heading("GitHub repository", 2),
-        adf_paragraph(info.get("description") or "(no description)"),
-        adf_heading("Metadata", 3),
-        adf_bullet_list(
-            [
-                f"URL: {info['html_url']}",
-                f"Default branch: {info.get('default_branch', 'main')}",
-                f"Visibility: {info.get('visibility', 'public')}",
-                f"Created: {info.get('created_at', '')}",
-                f"Last push: {info.get('pushed_at', '')}",
-            ]
-        ),
-    )
-    return {
-        "fields": {
-            "project": {"key": cfg["jira"]["project_key"]},
-            "issuetype": {"id": cfg["jira"]["epic_issuetype_id"]},
-            "summary": repo,
-            "description": desc,
-            "labels": [f"gh-repo-{cfg['github']['owner']}-{repo}"],
-        }
-    }
-
-
 def build_task_payload(
     cfg: Dict[str, Any],
     repo: str,
     pr: Dict[str, Any],
-    epic_key: str,
     commits: List[Dict[str, Any]],
 ) -> Dict[str, Any]:
     num = pr["number"]
     state = pr_state(pr)
+    owner = cfg["github"]["owner"]
+    project_key = repo_project_key(cfg, repo)
 
     nodes: List[Dict[str, Any]] = [adf_heading("Pull request description", 2)]
     for p in adf_paragraphs(truncate_text(pr.get("body") or "(no description)", 20000)):
@@ -159,19 +148,48 @@ def build_task_payload(
         ]
         nodes.append(adf_code_block(truncate_text("\n".join(lines), 8000)))
 
-    summary = f"[{repo}#{num}] {pr['title']}"[:255]
+    summary = f"[#{num}] {pr['title']}"[:255]
     return {
         "fields": {
-            "project": {"key": cfg["jira"]["project_key"]},
-            "issuetype": {"id": cfg["jira"]["task_issuetype_id"]},
+            "project": {"key": project_key},
+            "issuetype": {"name": cfg["jira"].get("task_issuetype_name", "Task")},
             "summary": summary,
             "description": adf_doc(*nodes),
-            "parent": {"key": epic_key},
             "labels": [
-                f"gh-pr-{cfg['github']['owner']}-{repo}-{num}",
+                f"gh-pr-{owner}-{repo}-{num}",
                 f"gh-repo-{repo}",
                 f"pr-{state}",
             ],
+        }
+    }
+
+
+def build_commits_issue_payload(cfg: Dict[str, Any], repo: str, info: Dict[str, Any]) -> Dict[str, Any]:
+    """A single Task per project that collects direct-to-main commits as comments."""
+    project_key = repo_project_key(cfg, repo)
+    owner = cfg["github"]["owner"]
+    desc = adf_doc(
+        adf_heading("Direct commits log", 2),
+        adf_paragraph(
+            "Commits pushed directly to the default branch (not associated with a PR). "
+            "Each commit is posted as a comment below."
+        ),
+        adf_heading("Repository", 3),
+        adf_bullet_list(
+            [
+                f"URL: {info['html_url']}",
+                f"Default branch: {info.get('default_branch', 'main')}",
+                f"Description: {info.get('description') or '(none)'}",
+            ]
+        ),
+    )
+    return {
+        "fields": {
+            "project": {"key": project_key},
+            "issuetype": {"name": cfg["jira"].get("commits_issuetype_name", "Task")},
+            "summary": f"[{repo}] Direct commits",
+            "description": desc,
+            "labels": [f"gh-repo-{owner}-{repo}", "direct-commits"],
         }
     }
 
@@ -225,26 +243,8 @@ def backfill_repo(session, cfg: Dict[str, Any], repo: str, dry_run: bool) -> Dic
     mapping = load_mapping(repo)
     owner = cfg["github"]["owner"]
     delay = float(cfg.get("write_delay", 0.15))
-
-    # -- Epic --
-    if mapping["epic"]:
-        print(f"  epic: {mapping['epic']} (already created, skip)")
-    else:
-        info = gh_repo_info(owner, repo)
-        payload = build_epic_payload(cfg, repo, info)
-        if dry_run:
-            print("  [DRY-RUN] EPIC payload (truncated to 2000 chars):")
-            print(json.dumps(payload, indent=2)[:2000])
-            mapping["epic"] = "VW-DRYEPIC"
-        else:
-            result = jira_create_issue(session, payload)
-            mapping["epic"] = result["key"]
-            print(f"  created Epic {result['key']}")
-            time.sleep(delay)
-        if not dry_run:
-            save_mapping(repo, mapping)
-
-    epic_key = mapping["epic"]
+    project_key = repo_project_key(cfg, repo)
+    print(f"  project: {project_key}")
 
     # -- PRs -> Tasks --
     prs = gh_pr_list(owner, repo)
@@ -257,18 +257,19 @@ def backfill_repo(session, cfg: Dict[str, Any], repo: str, dry_run: bool) -> Dic
             continue
 
         commits = gh_pr_commits(owner, repo, num)
-        payload = build_task_payload(cfg, repo, pr, epic_key, commits)
+        payload = build_task_payload(cfg, repo, pr, commits)
         state = pr_state(pr)
 
         if dry_run:
-            print(f"\n  [DRY-RUN] PR #{num} ({state}) -- TASK payload (truncated to 3000):")
+            print(f"\n  [DRY-RUN] PR #{num} ({state}) -- TASK payload (truncated):")
             print(json.dumps(payload, indent=2)[:3000])
-            task_key = f"VW-DRYPR{num}"
+            task_key = f"{project_key}-DRYPR{num}"
         else:
             result = jira_create_issue(session, payload)
             task_key = result["key"]
             print(f"  PR #{num} ({state}) -> Task {task_key}")
             time.sleep(delay)
+
         mapping["prs"][str(num)] = task_key
 
         issue_comments = gh_pr_issue_comments(owner, repo, num)
@@ -277,25 +278,11 @@ def backfill_repo(session, cfg: Dict[str, Any], repo: str, dry_run: bool) -> Dic
         total = (
             len(issue_comments)
             + len(review_comments)
-            + sum(1 for r in reviews if r.get("body"))
+            + sum(1 for r in reviews if r.get("body") or r.get("state") in ("APPROVED", "CHANGES_REQUESTED"))
         )
 
         if dry_run:
-            print(f"    [DRY-RUN] would post {total} Jira comment(s) to {task_key}")
-            if issue_comments:
-                print("    [DRY-RUN] sample issue_comment ADF:")
-                print(
-                    json.dumps(build_pr_comment(issue_comments[0], "issue_comment"), indent=2)[
-                        :1500
-                    ]
-                )
-            elif review_comments:
-                print("    [DRY-RUN] sample review_inline ADF:")
-                print(
-                    json.dumps(
-                        build_pr_comment(review_comments[0], "review_inline"), indent=2
-                    )[:1500]
-                )
+            print(f"    [DRY-RUN] would post {total} comment(s) to {task_key}")
         else:
             for c in issue_comments:
                 jira_add_comment(session, task_key, build_pr_comment(c, "issue_comment"))
@@ -310,7 +297,7 @@ def backfill_repo(session, cfg: Dict[str, Any], repo: str, dry_run: bool) -> Dic
             if total:
                 print(f"    posted {total} comment(s)")
 
-        # status transition based on PR state
+        # status transition
         target = cfg["status_map"].get(state)
         if target:
             if dry_run:
@@ -322,8 +309,8 @@ def backfill_repo(session, cfg: Dict[str, Any], repo: str, dry_run: bool) -> Dic
         if not dry_run:
             save_mapping(repo, mapping)
 
-    # -- Direct commits (default branch, not in any PR) -> Epic comments --
-    pr_shas = set()
+    # -- Direct commits -> "Direct Commits" Task --
+    pr_shas: set = set()
     for num_str in mapping["prs"]:
         try:
             for c in gh_pr_commits(owner, repo, int(num_str)):
@@ -334,8 +321,6 @@ def backfill_repo(session, cfg: Dict[str, Any], repo: str, dry_run: bool) -> Dic
     info = gh_repo_info(owner, repo)
     default_branch = info.get("default_branch", "main")
     all_commits = gh_repo_commits(owner, repo, default_branch)
-    # Skip merge commits (parents > 1) -- they are PR-merge artifacts, not
-    # true direct-to-main commits.
     direct = [
         c
         for c in all_commits
@@ -344,33 +329,50 @@ def backfill_repo(session, cfg: Dict[str, Any], repo: str, dry_run: bool) -> Dic
     skipped_merge = len([c for c in all_commits if c["sha"] not in pr_shas]) - len(direct)
     print(
         f"  {len(direct)} direct commit(s) (not in any PR); "
-        f"skipped {skipped_merge} PR-merge commit(s)"
+        f"skipped {skipped_merge} merge commit(s)"
     )
 
-    if dry_run and direct:
-        print("  [DRY-RUN] sample direct-commit Epic comment ADF:")
-        print(json.dumps(build_direct_commit_comment(direct[0]), indent=2)[:1500])
-        for c in direct:
-            mapping["commits"][c["sha"]] = epic_key
-    else:
+    if direct:
+        # Ensure the "Direct Commits" task exists
+        commits_key = mapping.get("commits_issue")
+        if not commits_key:
+            label = f"gh-repo-{owner}-{repo}"
+            commits_key = jira_find_by_label(session, project_key, label)
+            if not commits_key:
+                payload = build_commits_issue_payload(cfg, repo, info)
+                if dry_run:
+                    print("  [DRY-RUN] would create 'Direct Commits' task")
+                    commits_key = f"{project_key}-DRYCOMMITS"
+                else:
+                    result = jira_create_issue(session, payload)
+                    commits_key = result["key"]
+                    print(f"  created 'Direct Commits' task {commits_key}")
+                    time.sleep(delay)
+            mapping["commits_issue"] = commits_key
+            if not dry_run:
+                save_mapping(repo, mapping)
+
         for c in direct:
             sha = c["sha"]
-            if sha in mapping["commits"]:
+            if sha in mapping.get("commits", {}):
                 continue
-            jira_add_comment(session, epic_key, build_direct_commit_comment(c))
-            mapping["commits"][sha] = epic_key
-            time.sleep(delay)
-        if direct:
-            print(f"  posted {len(direct)} direct-commit comment(s) to {epic_key}")
+            if dry_run:
+                print(f"  [DRY-RUN] would post commit {sha[:7]} to {commits_key}")
+            else:
+                jira_add_comment(session, commits_key, build_direct_commit_comment(c))
+                mapping["commits"][sha] = commits_key
+                time.sleep(delay)
 
-    if not dry_run:
-        save_mapping(repo, mapping)
+        if not dry_run:
+            if direct:
+                print(f"  posted direct commits to {commits_key}")
+            save_mapping(repo, mapping)
 
     return {
         "repo": repo,
-        "epic": mapping["epic"],
+        "project": project_key,
         "prs": len(mapping["prs"]),
-        "direct_commits": len(mapping["commits"]),
+        "direct_commits": len(mapping.get("commits", {})),
     }
 
 
