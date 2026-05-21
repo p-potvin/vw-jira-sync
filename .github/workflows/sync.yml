@@ -19,6 +19,8 @@ jobs:
     # Security posture: do not run on GitHub-hosted runners. Execute inside the
     # tailnet on the GreenCloud VPS runner.
     runs-on: [self-hosted, greencloud-vps]
+    env:
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: 'true'
     steps:
       - name: Checkout vw-jira-sync source
         uses: actions/checkout@v4
