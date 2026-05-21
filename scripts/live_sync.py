@@ -1,9 +1,13 @@
 #!/usr/bin/env python3
-"""Live one-way GitHub -> Jira sync. Runs inside GitHub Actions.
+"""Live one-way GitHub -> Jira sync.
 
 Reads the webhook event from $GITHUB_EVENT_PATH (file) and $GITHUB_EVENT_NAME
-(env). Each repo has its own dedicated Jira project (repo_project_keys in
-config.yaml). Tasks are created directly in the project — no Epic wrapper.
+(env). This can run:
+  - inside GitHub Actions (event file provided by Actions), or
+  - on a server-side GitHub webhook receiver (event body written to a file).
+
+Each repo has its own dedicated Jira project (repo_project_keys in config.yaml).
+Tasks are created directly in the project — no Epic wrapper.
 
 Event coverage:
   pull_request               -> upsert Task, transition status

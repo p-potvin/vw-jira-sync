@@ -1,8 +1,13 @@
-"""Shared Jira + GitHub helpers used by backfill.py and (later) live_sync.py.
+"""Shared Jira + GitHub helpers used by backfill.py and live_sync.py.
 
 Reads its Jira token from $JIRA_TOKEN, or from the file pointed to by
-$JIRA_TOKEN_FILE. GitHub API calls go through the locally-authenticated
-`gh` CLI, so no GitHub token handling is needed here.
+$JIRA_TOKEN_FILE.
+
+GitHub API calls prefer an explicit token (recommended for server-side runs):
+  - $GITHUB_TOKEN (preferred)
+  - $GH_TOKEN
+
+If no token is present, we fall back to the locally-authenticated `gh` CLI.
 """
 
 from __future__ import annotations
@@ -13,7 +18,7 @@ import subprocess
 import sys
 import time
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 import requests
 from requests.auth import HTTPBasicAuth
@@ -232,12 +237,86 @@ def jira_transition(
 # GitHub helpers (via local `gh` CLI)
 # ---------------------------------------------------------------------------
 
-def gh_api(path: str, paginate: bool = False) -> Any:
-    cmd = ["gh", "api"]
-    if paginate:
-        cmd += ["--paginate"]
-    cmd.append(path)
+GITHUB_API_BASE = "https://api.github.com/"
+
+
+def _github_token() -> str:
+    return (os.environ.get("GITHUB_TOKEN") or os.environ.get("GH_TOKEN") or "").strip()
+
+
+def _github_headers(token: str) -> Dict[str, str]:
+    headers = {
+        "Accept": "application/vnd.github+json",
+        # Pinning a version keeps behavior stable; update intentionally.
+        "X-GitHub-Api-Version": "2022-11-28",
+        "User-Agent": "vw-jira-sync",
+    }
+    if token:
+        headers["Authorization"] = f"Bearer {token}"
+    return headers
+
+
+def _github_request(
+    method: str, path: str, token: str, params: Optional[Dict[str, Any]] = None
+) -> Tuple[requests.Response, Any]:
+    url = f"{GITHUB_API_BASE}{path.lstrip('/')}"
+    r = requests.request(method, url, headers=_github_headers(token), params=params, timeout=30)
+    if r.status_code >= 300:
+        raise RuntimeError(f"github api {path} failed: {r.status_code} {(r.text or '').strip()}")
+    if not (r.text or "").strip():
+        return r, None
     try:
+        return r, r.json()
+    except Exception:
+        return r, r.text
+
+
+def _parse_link_next(link_header: str | None) -> str | None:
+    if not link_header:
+        return None
+    # Format: <url>; rel="next", <url>; rel="last", ...
+    parts = [p.strip() for p in link_header.split(",") if p.strip()]
+    for part in parts:
+        if 'rel="next"' not in part:
+            continue
+        if part.startswith("<") and ">;" in part:
+            return part[1 : part.index(">;")]
+    return None
+
+
+def _github_paginate(path: str, token: str) -> Any:
+    # `path` should include any query string; we paginate until no `next`.
+    url = f"{GITHUB_API_BASE}{path.lstrip('/')}"
+    merged: List[Any] = []
+    while True:
+        r = requests.get(url, headers=_github_headers(token), timeout=30)
+        if r.status_code >= 300:
+            raise RuntimeError(f"github api {url} failed: {r.status_code} {(r.text or '').strip()}")
+        data = r.json() if (r.text or "").strip() else None
+        if isinstance(data, list):
+            merged.extend(data)
+        elif data is not None:
+            merged.append(data)
+        next_url = _parse_link_next(r.headers.get("Link"))
+        if not next_url:
+            break
+        url = next_url
+    return merged
+
+
+def gh_api(path: str, paginate: bool = False) -> Any:
+    token = _github_token()
+    if token:
+        if paginate:
+            return _github_paginate(path, token)
+        _, data = _github_request("GET", path, token)
+        return data
+
+    try:
+        cmd = ["gh", "api"]
+        if paginate:
+            cmd += ["--paginate"]
+        cmd.append(path)
         out = subprocess.run(
             cmd,
             capture_output=True,
@@ -246,28 +325,34 @@ def gh_api(path: str, paginate: bool = False) -> Any:
             encoding="utf-8",
             errors="replace",
         )
+        text = (out.stdout or "").strip()
+        if not text:
+            return None
+        try:
+            return json.loads(text)
+        except json.JSONDecodeError:
+            # `gh api --paginate` concatenates multiple JSON arrays. Decode each.
+            decoder = json.JSONDecoder()
+            merged: List[Any] = []
+            idx = 0
+            while idx < len(text):
+                obj, end = decoder.raw_decode(text, idx)
+                if isinstance(obj, list):
+                    merged.extend(obj)
+                else:
+                    merged.append(obj)
+                idx = end
+                while idx < len(text) and text[idx].isspace():
+                    idx += 1
+            return merged
+    except FileNotFoundError:
+        # No token and no gh CLI: fall back to anonymous GitHub REST API.
+        if paginate:
+            return _github_paginate(path, "")
+        _, data = _github_request("GET", path, "")
+        return data
     except subprocess.CalledProcessError as e:
         raise RuntimeError(f"gh api {path} failed: {(e.stderr or '').strip()}")
-    text = (out.stdout or "").strip()
-    if not text:
-        return None
-    try:
-        return json.loads(text)
-    except json.JSONDecodeError:
-        # `gh api --paginate` concatenates multiple JSON arrays. Decode each.
-        decoder = json.JSONDecoder()
-        merged: List[Any] = []
-        idx = 0
-        while idx < len(text):
-            obj, end = decoder.raw_decode(text, idx)
-            if isinstance(obj, list):
-                merged.extend(obj)
-            else:
-                merged.append(obj)
-            idx = end
-            while idx < len(text) and text[idx].isspace():
-                idx += 1
-        return merged
 
 
 def gh_repo_info(owner: str, repo: str) -> Dict[str, Any]:
