@@ -30,6 +30,11 @@ import yaml
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from jira_sync import (  # noqa: E402
+    adf_bullet_list,
+    adf_code_block,
+    adf_doc,
+    adf_heading,
+    adf_paragraphs,
     gh_api,
     gh_pr_commits,
     jira_add_comment,
@@ -39,6 +44,7 @@ from jira_sync import (  # noqa: E402
     jira_transition,
     jira_update_issue,
     load_token,
+    truncate_text,
 )
 from backfill import (  # noqa: E402
     build_commit_task_payload,
@@ -82,6 +88,10 @@ def label_pr_task(owner: str, repo: str, pr_num: int) -> str:
     return f"gh-pr-{owner}-{repo}-{pr_num}"
 
 
+def label_dependabot_alert(owner: str, repo: str, alert_id: str | int) -> str:
+    return f"gh-dependabot-alert-{owner}-{repo}-{alert_id}"
+
+
 
 def find_task_for_pr(
     session, cfg: Dict[str, Any], owner: str, repo: str, pr_num: int
@@ -94,6 +104,13 @@ def find_commit_task(session, cfg: Dict[str, Any], owner: str, repo: str, sha: s
     """Return existing Task for this commit SHA, or None."""
     proj = repo_project_key(cfg, repo)
     return jira_find_by_label(session, proj, f"gh-commit-{owner}-{repo}-{sha[:12]}")
+
+
+def find_dependabot_alert_task(
+    session, cfg: Dict[str, Any], owner: str, repo: str, alert_id: str | int
+) -> Optional[str]:
+    proj = repo_project_key(cfg, repo)
+    return jira_find_by_label(session, proj, label_dependabot_alert(owner, repo, alert_id))
 
 
 # ---------------------------------------------------------------------------
@@ -234,6 +251,122 @@ def handle_push(session, cfg, event):
         print(f"  commit {sha[:7]} -> Task {result['key']}")
 
 
+def _first_nonempty(*vals: Any) -> Any:
+    for v in vals:
+        if v is None:
+            continue
+        if isinstance(v, str) and not v.strip():
+            continue
+        return v
+    return None
+
+
+def _dependabot_alert_id(alert: Dict[str, Any]) -> str | int | None:
+    # GitHub payloads have used both `number` and `id` across APIs.
+    return _first_nonempty(alert.get("number"), alert.get("id"))
+
+
+def build_dependabot_alert_task_payload(
+    cfg: Dict[str, Any], owner: str, repo: str, alert: Dict[str, Any]
+) -> Dict[str, Any]:
+    project_key = repo_project_key(cfg, repo)
+    alert_id = _dependabot_alert_id(alert)
+
+    dep = alert.get("dependency") or {}
+    pkg = dep.get("package") or {}
+    advisory = alert.get("security_advisory") or {}
+    vuln = alert.get("security_vulnerability") or {}
+
+    severity = _first_nonempty(vuln.get("severity"), advisory.get("severity"), "unknown")
+    package_name = _first_nonempty(pkg.get("name"), dep.get("package_name"), "(unknown package)")
+    manifest = _first_nonempty(dep.get("manifest_path"), dep.get("manifest"), "")
+    scope = _first_nonempty(dep.get("scope"), "")
+    summary_text = _first_nonempty(advisory.get("summary"), advisory.get("description"), "Dependabot vulnerability alert")
+
+    summary = f"[Dependabot] {severity}: {package_name}"
+    if manifest:
+        summary += f" ({manifest})"
+    summary = summary[:255]
+
+    url = _first_nonempty(alert.get("html_url"), advisory.get("ghsa_id"), "")
+    if isinstance(url, str) and url and not url.startswith("http"):
+        url = ""
+
+    bullets = [
+        f"Repo: {owner}/{repo}",
+        f"Alert: {alert_id}" if alert_id is not None else "Alert: (unknown id)",
+        f"Severity: {severity}",
+        f"Package: {package_name}",
+    ]
+    if scope:
+        bullets.append(f"Scope: {scope}")
+    if manifest:
+        bullets.append(f"Manifest: {manifest}")
+    if url:
+        bullets.append(f"URL: {url}")
+
+    nodes: list[dict[str, Any]] = [adf_heading("Dependabot vulnerability alert", 2)]
+    for p in adf_paragraphs(truncate_text(str(summary_text), 20000)):
+        nodes.append(p)
+    nodes.append(adf_heading("Metadata", 3))
+    nodes.append(adf_bullet_list(bullets))
+
+    # Keep a compact JSON excerpt for forensics without bloating Jira.
+    nodes.append(adf_heading("Raw payload (excerpt)", 3))
+    excerpt = {
+        "actionable": {
+            "dependency": dep,
+            "security_vulnerability": vuln,
+            "security_advisory": {
+                k: advisory.get(k)
+                for k in ("summary", "severity", "cve_id", "ghsa_id", "references", "identifiers")
+                if advisory.get(k) is not None
+            },
+        }
+    }
+    nodes.append(adf_code_block(truncate_text(json.dumps(excerpt, indent=2)[:20000]), "json"))
+
+    payload = {
+        "fields": {
+            "project": {"key": project_key},
+            "issuetype": {"name": cfg["jira"].get("task_issuetype_name", "Task")},
+            "summary": summary,
+            "description": adf_doc(*nodes),
+            "labels": [label_dependabot_alert(owner, repo, alert_id or "unknown")],
+        }
+    }
+    return payload
+
+
+def handle_dependabot_alert(session, cfg, event):
+    owner, gh_repo = get_owner_repo(event)
+    repo = normalize_repo(cfg, gh_repo)
+    action = (event.get("action") or "").strip()
+    alert = event.get("alert") or {}
+    alert_id = _dependabot_alert_id(alert)
+
+    if alert_id is None:
+        print(f"dependabot_alert[{action}] {owner}/{repo} missing alert id -- ignored")
+        return
+
+    print(f"dependabot_alert[{action}] {owner}/{repo} alert={alert_id}")
+    task_key = find_dependabot_alert_task(session, cfg, owner, repo, alert_id)
+
+    # Create (idempotent) on first-seen states; other actions can be layered later.
+    create_actions = {"created", "reintroduced", "reopened"}
+    if action not in create_actions:
+        print(f"  action '{action}' ignored (create_actions={sorted(create_actions)})")
+        return
+
+    if task_key:
+        print(f"  already has Task {task_key}, skip")
+        return
+
+    payload = build_dependabot_alert_task_payload(cfg, owner, repo, alert)
+    result = jira_create_issue(session, payload)
+    print(f"  created {result['key']}")
+
+
 # ---------------------------------------------------------------------------
 # Entry
 # ---------------------------------------------------------------------------
@@ -244,6 +377,7 @@ HANDLERS = {
     "pull_request_review_comment": handle_pull_request_review_comment,
     "issue_comment": handle_issue_comment,
     "push": handle_push,
+    "dependabot_alert": handle_dependabot_alert,
 }
 
 

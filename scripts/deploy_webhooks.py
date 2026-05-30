@@ -33,6 +33,7 @@ WEBHOOK_EVENTS = [
     "pull_request_review",
     "pull_request_review_comment",
     "issue_comment",
+    "dependabot_alert",
 ]
 
 DRY_RUN = "--dry-run" in sys.argv
