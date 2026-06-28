@@ -17,6 +17,7 @@ repo_owners:
   link-sharing: Prom-King
   prelanding-page: Prom-King
   qa-automation: Prom-King
+  shared-tube: Prom-King
   tube-sites: Prom-King
 
 # When a GitHub repo is renamed:
@@ -80,6 +81,7 @@ repo_project_keys:
   link-sharing: PKLS
   prelanding-page: PKPRE
   qa-automation: PKQA
+  shared-tube: PKST
   tube-sites: PKTS
 
 # Repos to backfill / sync.
@@ -126,4 +128,5 @@ repos:
   - link-sharing
   - prelanding-page
   - qa-automation
+  - shared-tube
   - tube-sites
