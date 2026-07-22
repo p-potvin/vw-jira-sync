@@ -49,6 +49,7 @@ repo_project_keys:
   vaultwares-pipelines: VPIPE
   vaultwares-glass: VGLS
   vault-explorer: VEXP
+  vault-tv: VTV
   vault-player: VPLAY
   vaultwares-adk: VADK
   windows-customizer: WCUST
@@ -96,6 +97,7 @@ repos:
   - vaultwares-pipelines
   - vaultwares-glass
   - vault-explorer
+  - vault-tv
   - vault-player
   - vaultwares-adk           # was: vaultwares-agentciation (renamed on GH)
   - windows-customizer
